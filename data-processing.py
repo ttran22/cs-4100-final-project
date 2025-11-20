@@ -14,7 +14,6 @@ from skimage.io import imread
 from skimage.transform import resize
 from ultralytics import YOLO
 
-
 # prepping data
 emotions_label = ["angry", "disgust", "fear", "happy", "neutral", "sad", "suprise"]
 image_data = []
