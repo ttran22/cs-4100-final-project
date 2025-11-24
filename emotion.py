@@ -18,6 +18,7 @@ warnings.filterwarnings('ignore')
 
 # Emotion labels
 EMOTIONS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+weights =  [1.5, 3.0, 1.5, 0.8, 1.1, 1.0, 1.2]
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -52,7 +53,7 @@ def train_model(model, model_name, num_epochs=50, learning_rate=0.001):
     print(f'Training {model_name}')
     
     model = model.to(device)
-    class_weights = torch.tensor([1.5, 3.0, 1.5, 0.8, 1.2, 1.0, 1.2]).to(device)
+    class_weights = torch.tensor(weights).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 
