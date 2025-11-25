@@ -17,7 +17,7 @@ class Conv_Net(nn.Module):
                 nn.BatchNorm2d(output),
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2),
-                nn.Dropout2d(0.2)
+                nn.Dropout2d(0.1)
             )
 
         self.block1 = conv_block(1, 64)
@@ -32,7 +32,7 @@ class Conv_Net(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.1),
             nn.Linear(256, 7)
         )
 

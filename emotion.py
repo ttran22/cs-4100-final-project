@@ -41,7 +41,7 @@ train_transform = transforms.Compose([
     transforms.Normalize(mean=[0.5], std=[0.5])
 ])
 
-batch_size = 128
+batch_size = 256
 
 trainset = datasets.ImageFolder(root='train', transform=train_transform)
 testset = datasets.ImageFolder(root='test', transform=transform)
@@ -69,7 +69,7 @@ def train_model(model, model_name, num_epochs=50, learning_rate=0.001):
     
     best_val_acc = 0.0
     patience = 0
-    max_patience = 7
+    max_patience = 20
     
     for epoch in range(num_epochs):
         # Training phase
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     cnn_model = Conv_Net()
     cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs = train_model(cnn_model, 
                                                                                  'Emotion CNN',
-                                                                                 40)
+                                                                                 100)
     
     # Load best models for evaluation
     ffn_model.load_state_dict(torch.load('emotion_ffn_best.pth'))
