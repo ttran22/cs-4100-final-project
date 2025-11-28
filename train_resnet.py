@@ -17,6 +17,8 @@ import seaborn as sns
 
 from resnet_model import ResNetEmotion
 
+#AI was used throughout the code. 
+
 # -------- Device selection (M1/M2 GPU > CUDA > CPU) --------
 if torch.backends.mps.is_available():
     device = torch.device("mps")      # Apple Silicon GPU
@@ -29,10 +31,10 @@ print("Using device:", device)
 FACES_TRAIN_DIR = os.path.join("faces", "train")
 FACES_TEST_DIR = os.path.join("faces", "test")
 
-EPOCHS = 40
+EPOCHS = 60
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-PATIENCE = 10  # early stopping
+PATIENCE = 15  # early stopping
 
 
 def build_dataloaders():
@@ -45,9 +47,10 @@ def build_dataloaders():
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
         transforms.ColorJitter(brightness=0.1, contrast=0.1),
+        transforms.RandomGrayscale(p=0.1),   # <- NEW
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],   # ImageNet stats
+            mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
         ),
     ])
@@ -70,6 +73,53 @@ def build_dataloaders():
     print("ImageFolder class_to_idx:", train_dataset.class_to_idx)
     return train_loader, test_loader, train_dataset.class_to_idx
 
+def mixup_data(x, y, alpha=0.2):
+    """Apply MixUp to a batch."""
+    if alpha <= 0:
+        return x, y, y, 1.0
+    lam = np.random.beta(alpha, alpha)
+    batch_size = x.size(0)
+    index = torch.randperm(batch_size).to(x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+def rand_bbox(size, lam):
+    """Generate CutMix bounding box."""
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1.0 - lam)
+    cut_w = int(W * cut_rat)
+    cut_h = int(H * cut_rat)
+
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    x1 = np.clip(cx - cut_w // 2, 0, W)
+    y1 = np.clip(cy - cut_h // 2, 0, H)
+    x2 = np.clip(cx + cut_w // 2, 0, W)
+    y2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return x1, y1, x2, y2
+
+def cutmix_data(x, y, alpha=1.0):
+    """Apply CutMix to a batch."""
+    if alpha <= 0:
+        return x, y, y, 1.0
+    lam = np.random.beta(alpha, alpha)
+    batch_size = x.size(0)
+    index = torch.randperm(batch_size).to(x.device)
+
+    shuffled_x = x[index]
+    y_a, y_b = y, y[index]
+
+    x1, y1, x2, y2 = rand_bbox(x.size(), lam)
+    x[:, :, y1:y2, x1:x2] = shuffled_x[:, :, y1:y2, x1:x2]
+
+    # Adjust lambda to exact area ratio
+    lam = 1.0 - ((x2 - x1) * (y2 - y1) / (x.size(-1) * x.size(-2)))
+    return x, y_a, y_b, lam 
 
 def train_resnet():
     if not os.path.isdir(FACES_TRAIN_DIR) or not os.path.isdir(FACES_TEST_DIR):
@@ -91,6 +141,12 @@ def train_resnet():
     inv = 1.0 / counts
     weights = torch.FloatTensor(inv / inv.sum() * num_classes).to(device)
 
+    # Extra emphasis on fear and sad
+    fear_idx = class_to_idx["fear"]
+    sad_idx  = class_to_idx["sad"]
+    weights[fear_idx] *= 1.3
+    weights[sad_idx]  *= 1.3
+
     criterion = nn.CrossEntropyLoss(weight=weights)
     optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
@@ -110,13 +166,33 @@ def train_resnet():
         correct = 0
         total = 0
 
+        MIXUP_PROB = 0.3
+        CUTMIX_PROB = 0.3
+
         for images, labels in train_loader:
             images = images.to(device)
             labels = labels.to(device)
 
+            r = np.random.rand()
+            use_mixup = r < MIXUP_PROB
+            use_cutmix = (not use_mixup) and (r < MIXUP_PROB + CUTMIX_PROB)
+
+            if use_mixup:
+                images, targets_a, targets_b, lam = mixup_data(images, labels, alpha=0.2)
+            elif use_cutmix:
+                images, targets_a, targets_b, lam = cutmix_data(images, labels, alpha=1.0)
+            else:
+                targets_a, targets_b, lam = labels, labels, 1.0
+
             optimizer.zero_grad()
             outputs = model(images)
-            loss = criterion(outputs, labels)
+
+            if use_mixup or use_cutmix:
+                loss = (lam * criterion(outputs, targets_a) +
+                        (1 - lam) * criterion(outputs, targets_b))
+            else:
+                loss = criterion(outputs, labels)
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
             optimizer.step()

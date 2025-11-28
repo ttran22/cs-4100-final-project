@@ -8,6 +8,8 @@ import cv2
 from tqdm import tqdm
 import mediapipe as mp
 
+#AI was used throughout the code. 
+
 EMOTIONS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 
 INPUT_TRAIN_DIR = "train"
@@ -98,10 +100,16 @@ def process_split(input_root: str, output_root: str, detector):
             crops = detect_and_crop_faces(img_path, detector)
 
             if not crops:
-                no_face += 1
-                continue
+                # Fallback: use full image resized to 224x224
+                img = cv2.imread(img_path)
+                if img is None:
+                    no_face += 1
+                    continue
+                face = cv2.resize(img, (FACE_SIZE, FACE_SIZE),
+                                  interpolation=cv2.INTER_AREA)
+            else:
+                face = crops[0]
 
-            face = crops[0]
             out_name = os.path.splitext(fname)[0] + "_face.jpg"
             out_path = os.path.join(out_dir, out_name)
             cv2.imwrite(out_path, face)
