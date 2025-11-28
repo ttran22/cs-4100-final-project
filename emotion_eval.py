@@ -9,7 +9,7 @@ from cnn import *
 from ffn import *
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.metrics import confusion_matrix, classification_report
 import seaborn as sns
 from tqdm import tqdm
 import os
@@ -223,6 +223,7 @@ def plot_training_history(train_losses, train_accs, val_losses, val_accs, model_
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
+    
     plt.tight_layout()
     plt.savefig(f'{model_name.lower().replace(" ", "_")}_training_history.png', dpi=150)
     plt.close()
@@ -268,7 +269,32 @@ def plot_examples(correct_examples, incorrect_examples, model_name):
     plt.savefig(f'{model_name.lower().replace(" ", "_")}_examples.png', dpi=150)
     plt.close()
 
+def plot_compare_accuracies(accuracies):
+    figure1, figure2 = plt.subplots(1, 2, fig_size =(20, 10))
+
+
+    for model, (train_acc, val_acc) in accuracies.items():
+        figure1.plot(train_acc, model=model, linewidth=3)
     
+    figure1.set_xlabel('Epoch', fontsize=10)
+    figure1.set_ylabel('Accuracy (%)', fontsize=10)
+    figure1.set_title('Training Acc. Comparison', fontsize=12)
+    figure1.legend(fontsize=8)
+
+
+    for model, (train_acc, val_acc) in accuracies.items():
+        figure2.plot(val_acc, model=model, linewidth=3)
+    
+    figure2.set_xlabel('Epoch', fontsize=10)
+    figure2.set_ylabel('Accuracy (%)', fontsize=10)
+    figure2.set_title('Validation Acc. Comparison', fontsize=12)
+    figure2.legend(fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig("model_accuracy_comparison.png", dpi=150)
+    plt.close()
+
+
 # Main execution
 if __name__ == '__main__':
     # Train FFN
@@ -323,6 +349,13 @@ if __name__ == '__main__':
     plot_examples(cnn_correct, cnn_incorrect, 'Emotion CNN')
     plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
     
+    model_accuracies = {
+        "FFN":[ffn_train_accs, ffn_val_accs],
+        "CNN":[cnn_train_accs, cnn_val_accs],
+        "ResNet":[resnet_train_accs, resnet_val_accs],
+    }
+    plot_compare_accuracies(model_accuracies)
+
     # Total parameters
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters())
