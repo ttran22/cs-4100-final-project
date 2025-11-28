@@ -5,20 +5,29 @@ import torch.nn.functional as F
 from cnn import *
 from ultralytics import YOLO
 import numpy as np
+from resnet_model import ResNetEmotion
 
 EMOTIONS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model_path = "emotion_cnn_best.pth"
+cnn_model_path = 'emotion_cnn_best.pth'
 yolo_model = 'yolov8n.pt'
+resnet_model_path = 'resnet_emotion_best.pth'
+
 
 # CNN model
 cnn_model = Conv_Net()
-cnn_model.load_state_dict(torch.load(model_path, map_location=device))
+cnn_model.load_state_dict(torch.load(cnn_model_path, map_location=device))
 cnn_model.to(device)
 cnn_model.eval()
 
 # YOLO Model
 yolo_model = YOLO(yolo_model)
+
+# ResNet Model
+resnet_model = ResNetEmotion(num_classes=7, pretrained=True)
+resnet_model.load_state_dict(torch.load(resnet_model_path,map_location=device))
+resnet_model.to(device)
+resnet_model.eval()
 
 # Preprocess image
 def preprocess(img):

@@ -6,6 +6,7 @@ from collections import deque
 
 from cnn import Conv_Net
 from ffn import FF_Net
+from resnet_model import ResNetEmotion
 from region import Region_Net, RegionFeatureExtractor
 
 EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
@@ -13,18 +14,25 @@ EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 COLORS = {
     'CNN': (255, 100, 100),
     'FFN': (100, 255, 100),
+    'ResNet': (255, 165, 0),
     'Region': (100, 100, 255),
     'box': (0, 255, 0),
 }
 
-
 class EmotionDetector:
     def __init__(self, cnn_path='emotion_cnn_best.pth', 
                  ffn_path='emotion_ffn_best.pth',
+                 resnet_path = 'resnet_emotion_best.pth',
                  region_path='emotion_region_best.pth'):
         
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"Device: {self.device}")
+        # -------- Device selection (M1/M2 GPU > CUDA > CPU) --------
+        if torch.backends.mps.is_available():
+            self.device = torch.device("mps")      # Apple Silicon GPU
+        elif torch.cuda.is_available():
+            self.device = torch.device("cuda")     # NVIDIA GPU
+        else:
+            self.device = torch.device("cpu")      # Fallback
+        print("Using device:",self.device)
         
         # Load CNN
         self.cnn = Conv_Net()
@@ -47,6 +55,17 @@ class EmotionDetector:
         except FileNotFoundError:
             print(f"FFN not found: {ffn_path}")
             self.ffn_available = False
+
+        # Load ResNet
+        self.resnet = ResNetEmotion()
+        try:
+            self.resnet.load_state_dict(torch.load(resnet_path, map_location=self.device))
+            self.resnet = self.resnet.to(self.device).eval()
+            self.resnet_available = True
+            print("ResNet loaded")
+        except FileNotFoundError:
+            print(f"ResNet not found: {resnet_path}")
+            self.resnet_available = False
         
         # Load Region
         self.region_net = Region_Net()
@@ -64,7 +83,7 @@ class EmotionDetector:
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         )
         
-        self.history = {k: deque(maxlen=5) for k in ['CNN', 'FFN', 'Region']}
+        self.history = {k: deque(maxlen=5) for k in ['CNN', 'FFN', 'ResNet', 'Region']}
         self.fps_history = deque(maxlen=30)
     
     def preprocess(self, face_roi):
@@ -74,6 +93,18 @@ class EmotionDetector:
         normalized = (resized.astype(np.float32) / 255.0 - 0.5) / 0.5
         tensor = torch.FloatTensor(normalized).unsqueeze(0).unsqueeze(0)
         return tensor.to(self.device)
+    
+    def preprocess_resnet(self, face_roi):
+        """Preprocess for ResNet: RGB with ImageNet normalization."""
+        # Convert to RGB
+        rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb, (48, 48))  
+        tensor = torch.FloatTensor(resized).permute(2, 0, 1).unsqueeze(0)
+        tensor = tensor / 255.0
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(self.device)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(self.device)
+        tensor = (tensor.to(self.device) - mean) / std
+        return tensor
     
     def smooth(self, model_name, probs):
         """Smooth predictions over time."""
@@ -97,7 +128,14 @@ class EmotionDetector:
                 probs = self.smooth('FFN', out)
                 results['FFN'] = {'emotion': EMOTIONS[np.argmax(probs)], 
                                  'confidence': np.max(probs), 'probs': probs}
-            
+
+            if self.resnet_available:
+                resnet_torch = self.preprocess_resnet(face_roi)
+                out = torch.softmax(self.resnet(resnet_torch), dim=1).cpu().numpy()[0]
+                probs = self.smooth('ResNet', out)
+                results['ResNet'] = {'emotion': EMOTIONS[np.argmax(probs)], 
+                                 'confidence': np.max(probs), 'probs': probs}
+                
             if self.region_available:
                 face_rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
                 features = self.region_extractor.extract_features(face_rgb)
@@ -148,12 +186,13 @@ class EmotionDetector:
                             COLORS[name] if prob == max(pred['probs']) else (100,100,100), -1)
                 cv2.putText(frame, emo[:3], (start_x + bar_w + 3, y_pos + 10),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255), 1)
-    
+
+
     def run(self, camera_id=0, show_probs=True, show_landmarks=False):
         """Main loop."""
         cap = cv2.VideoCapture(camera_id)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 850)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
         
         if not cap.isOpened():
             print("Cannot open camera")
@@ -213,7 +252,7 @@ class EmotionDetector:
 def main():
     import argparse
     
-    detector = EmotionDetector('emotion_cnn_best.pth', 'emotion_ffn_best.pth', 'emotion_region_best.pth')
+    detector = EmotionDetector('emotion_cnn_best.pth', 'emotion_ffn_best.pth', 'resnet_emotion_best.pth', 'emotion_region_best.pth')
     detector.run(0, True, False)
 
 

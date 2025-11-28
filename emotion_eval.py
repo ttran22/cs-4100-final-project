@@ -9,11 +9,12 @@ from cnn import *
 from ffn import *
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 import seaborn as sns
 from tqdm import tqdm
 import os
 import warnings
+from resnet_model import ResNetEmotion
 warnings.filterwarnings('ignore')
 
 # Emotion labels
@@ -61,7 +62,6 @@ def train_model(model, model_name, num_epochs=50, learning_rate=0.001):
                                                                T_mult=1,    # Keep cycle length constant
                                                                eta_min=1e-6 # Minimum learning rate
                                                                )
-    
     train_losses = []
     train_accs = []
     val_losses = []
@@ -268,6 +268,7 @@ def plot_examples(correct_examples, incorrect_examples, model_name):
     plt.savefig(f'{model_name.lower().replace(" ", "_")}_examples.png', dpi=150)
     plt.close()
 
+    
 # Main execution
 if __name__ == '__main__':
     # Train FFN
@@ -284,12 +285,22 @@ if __name__ == '__main__':
                                                                                  'Emotion CNN',
                                                                                  100)
     
+    # Train ResNet
+    print('TRAINING CONVOLUTIONAL NEURAL NETWORK')
+    resnet_model = ResNetEmotion()
+    resnet_train_losses, resnet_train_accs, resnet_val_losses, resnet_val_accs = train_model(resnet_model, 
+                                                                                 'Emotion ResNet',
+                                                                                 100)
+    
     # Load best models for evaluation
     ffn_model.load_state_dict(torch.load('emotion_ffn_best.pth'))
     ffn_model = ffn_model.to(device)
     
     cnn_model.load_state_dict(torch.load('emotion_cnn_best.pth'))
     cnn_model = cnn_model.to(device)
+
+    resnet_model.load_state_dict(torch.load('resnet_emotion_best.pth'))
+    resnet_model = resnet_model.to(device)
     
     # Evaluate FFN
     ffn_preds, ffn_labels, ffn_correct, ffn_incorrect = evaluate_model(ffn_model, 'Emotion FFN')
@@ -297,14 +308,20 @@ if __name__ == '__main__':
     # Evaluate CNN
     cnn_preds, cnn_labels, cnn_correct, cnn_incorrect = evaluate_model(cnn_model, 'Emotion CNN')
     
+    # Evaluate ResNet
+    resnet_preds, resnet_labels, resnet_correct, resnet_incorrect = evaluate_model(resnet_model, 'Emotion CNN')
+
     # Generate visualizations
     print('\nGenerating visualizations...')
     plot_training_history(ffn_train_losses, ffn_train_accs, ffn_val_losses, ffn_val_accs, 'Emotion FFN')
     plot_training_history(cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs, 'Emotion CNN')
+    plot_training_history(resnet_train_losses, resnet_train_accs, resnet_val_losses, resnet_val_accs, 'Emotion ResNet')
     plot_confusion_matrix(ffn_labels, ffn_preds, 'Emotion FFN')
     plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion CNN')
+    plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
     plot_examples(ffn_correct, ffn_incorrect, 'Emotion FFN')
     plot_examples(cnn_correct, cnn_incorrect, 'Emotion CNN')
+    plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
     
     # Total parameters
     def count_parameters(model):
@@ -313,3 +330,4 @@ if __name__ == '__main__':
     print('MODEL COMPARISON')
     print(f'FFN Parameters: {count_parameters(ffn_model):,}')
     print(f'CNN Parameters: {count_parameters(cnn_model):,}')
+    print(f'ResNet Parameters: {count_parameters(resnet_model):,}')
