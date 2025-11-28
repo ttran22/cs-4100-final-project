@@ -22,7 +22,13 @@ EMOTIONS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 weights =  [1.5, 3.0, 1.5, 0.8, 1.1, 1.0, 1.2]
 
 # Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.backends.mps.is_available():
+    device = torch.device("mps")      # Apple Silicon GPU
+elif torch.cuda.is_available():
+    device = torch.device("cuda")     # NVIDIA GPU
+else:
+    device = torch.device("cpu")      # Fallback
+print("Using device:",device)
 print(f'Using device: {device}')
 
 transform = transforms.Compose([                            # Use transforms to convert images to tensors and normalize them
@@ -270,25 +276,25 @@ def plot_examples(correct_examples, incorrect_examples, model_name):
     plt.close()
 
 def plot_compare_accuracies(accuracies):
-    figure1, figure2 = plt.subplots(1, 2, fig_size =(20, 10))
+    figure, axes = plt.subplots(1, 2, figsize =(20, 10))
 
-
+    # training accuracy
     for model, (train_acc, val_acc) in accuracies.items():
-        figure1.plot(train_acc, model=model, linewidth=3)
+        figure.plot(train_acc, model=model, linewidth=3)
     
-    figure1.set_xlabel('Epoch', fontsize=10)
-    figure1.set_ylabel('Accuracy (%)', fontsize=10)
-    figure1.set_title('Training Acc. Comparison', fontsize=12)
-    figure1.legend(fontsize=8)
+    axes[0].set_xlabel('Epoch', fontsize=10)
+    axes[0].set_ylabel('Accuracy (%)', fontsize=10)
+    axes[0].set_title('Training Acc. Comparison', fontsize=12)
+    axes[0].legend(fontsize=8)
 
-
+    #validation accuracy
     for model, (train_acc, val_acc) in accuracies.items():
-        figure2.plot(val_acc, model=model, linewidth=3)
+        axes[1].plot(val_acc, model=model, linewidth=3)
     
-    figure2.set_xlabel('Epoch', fontsize=10)
-    figure2.set_ylabel('Accuracy (%)', fontsize=10)
-    figure2.set_title('Validation Acc. Comparison', fontsize=12)
-    figure2.legend(fontsize=8)
+    axes[1].set_xlabel('Epoch', fontsize=10)
+    axes[1].set_ylabel('Accuracy (%)', fontsize=10)
+    axes[1].set_title('Validation Acc. Comparison', fontsize=12)
+    axes[1].legend(fontsize=8)
 
     plt.tight_layout()
     plt.savefig("model_accuracy_comparison.png", dpi=150)
@@ -298,60 +304,61 @@ def plot_compare_accuracies(accuracies):
 # Main execution
 if __name__ == '__main__':
     # Train FFN
-    print('TRAINING FEEDFORWARD NETWORK')
-    ffn_model = FF_Net()
-    ffn_train_losses, ffn_train_accs, ffn_val_losses, ffn_val_accs = train_model(ffn_model,
-                                                                                'Emotion FFN',
-                                                                                40)
+    # print('TRAINING FEEDFORWARD NETWORK')
+    # ffn_model = FF_Net()
+    # ffn_train_losses, ffn_train_accs, ffn_val_losses, ffn_val_accs = train_model(ffn_model,
+    #                                                                             'Emotion FFN',
+    #                                                                             40)
     
-    # Train CNN
-    print('TRAINING CONVOLUTIONAL NEURAL NETWORK')
-    cnn_model = Conv_Net()
-    cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs = train_model(cnn_model, 
-                                                                                 'Emotion CNN',
-                                                                                 100)
+    # # Train CNN
+    # print('TRAINING CONVOLUTIONAL NEURAL NETWORK')
+    # cnn_model = Conv_Net()
+    # cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs = train_model(cnn_model, 
+    #                                                                              'Emotion CNN',
+    #                                                                              100)
     
     # Train ResNet
-    print('TRAINING CONVOLUTIONAL NEURAL NETWORK')
+    print('TRAINING RESNET')
     resnet_model = ResNetEmotion()
     resnet_train_losses, resnet_train_accs, resnet_val_losses, resnet_val_accs = train_model(resnet_model, 
                                                                                  'Emotion ResNet',
                                                                                  100)
     
-    # Load best models for evaluation
-    ffn_model.load_state_dict(torch.load('emotion_ffn_best.pth'))
-    ffn_model = ffn_model.to(device)
+    # # Load best models for evaluation
+    # ffn_model.load_state_dict(torch.load('emotion_ffn_best.pth'))
+    # ffn_model = ffn_model.to(device)
     
-    cnn_model.load_state_dict(torch.load('emotion_cnn_best.pth'))
-    cnn_model = cnn_model.to(device)
+    # cnn_model.load_state_dict(torch.load('emotion_cnn_best.pth'))
+    # cnn_model = cnn_model.to(device)
 
     resnet_model.load_state_dict(torch.load('resnet_emotion_best.pth'))
     resnet_model = resnet_model.to(device)
     
-    # Evaluate FFN
-    ffn_preds, ffn_labels, ffn_correct, ffn_incorrect = evaluate_model(ffn_model, 'Emotion FFN')
+    # # Evaluate FFN
+    # ffn_preds, ffn_labels, ffn_correct, ffn_incorrect = evaluate_model(ffn_model, 'Emotion FFN')
     
-    # Evaluate CNN
-    cnn_preds, cnn_labels, cnn_correct, cnn_incorrect = evaluate_model(cnn_model, 'Emotion CNN')
+    # # Evaluate CNN
+    # cnn_preds, cnn_labels, cnn_correct, cnn_incorrect = evaluate_model(cnn_model, 'Emotion CNN')
     
     # Evaluate ResNet
-    resnet_preds, resnet_labels, resnet_correct, resnet_incorrect = evaluate_model(resnet_model, 'Emotion CNN')
+    resnet_preds, resnet_labels, resnet_correct, resnet_incorrect = evaluate_model(resnet_model, 'Emotion ResNet')
+    
 
     # Generate visualizations
     print('\nGenerating visualizations...')
-    plot_training_history(ffn_train_losses, ffn_train_accs, ffn_val_losses, ffn_val_accs, 'Emotion FFN')
-    plot_training_history(cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs, 'Emotion CNN')
+    # plot_training_history(ffn_train_losses, ffn_train_accs, ffn_val_losses, ffn_val_accs, 'Emotion FFN')
+    # plot_training_history(cnn_train_losses, cnn_train_accs, cnn_val_losses, cnn_val_accs, 'Emotion CNN')
     plot_training_history(resnet_train_losses, resnet_train_accs, resnet_val_losses, resnet_val_accs, 'Emotion ResNet')
-    plot_confusion_matrix(ffn_labels, ffn_preds, 'Emotion FFN')
-    plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion CNN')
-    plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
-    plot_examples(ffn_correct, ffn_incorrect, 'Emotion FFN')
-    plot_examples(cnn_correct, cnn_incorrect, 'Emotion CNN')
-    plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
+    # plot_confusion_matrix(ffn_labels, ffn_preds, 'Emotion FFN')
+    # plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion CNN')
+    # plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
+    # plot_examples(ffn_correct, ffn_incorrect, 'Emotion FFN')
+    # plot_examples(cnn_correct, cnn_incorrect, 'Emotion CNN')
+    # plot_confusion_matrix(cnn_labels, cnn_preds, 'Emotion ResNet')
     
     model_accuracies = {
-        "FFN":[ffn_train_accs, ffn_val_accs],
-        "CNN":[cnn_train_accs, cnn_val_accs],
+        # "FFN":[ffn_train_accs, ffn_val_accs],
+        # "CNN":[cnn_train_accs, cnn_val_accs],
         "ResNet":[resnet_train_accs, resnet_val_accs],
     }
     plot_compare_accuracies(model_accuracies)
@@ -361,6 +368,6 @@ if __name__ == '__main__':
         return sum(p.numel() for p in model.parameters())
     
     print('MODEL COMPARISON')
-    print(f'FFN Parameters: {count_parameters(ffn_model):,}')
-    print(f'CNN Parameters: {count_parameters(cnn_model):,}')
+    # print(f'FFN Parameters: {count_parameters(ffn_model):,}')
+    # print(f'CNN Parameters: {count_parameters(cnn_model):,}')
     print(f'ResNet Parameters: {count_parameters(resnet_model):,}')
