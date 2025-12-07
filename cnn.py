@@ -9,6 +9,7 @@ class Conv_Net(nn.Module):
         super().__init__()
 
         def conv_block(input, output):
+            
             return nn.Sequential(
                 nn.Conv2d(input, output, 3, padding=1),
                 nn.BatchNorm2d(output),
