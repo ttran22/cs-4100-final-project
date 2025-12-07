@@ -6,6 +6,7 @@ class ResNetEmotion(nn.Module):
     ResNet18 backbone with a new 7-class output layer for emotions.
     Uses pretrained ImageNet weights by default.
     """
+    
     def __init__(self, num_classes: int = 7, pretrained: bool = True):
         super().__init__()
         if pretrained:
@@ -20,3 +21,4 @@ class ResNetEmotion(nn.Module):
 
     def forward(self, x):
         return self.backbone(x)
+    

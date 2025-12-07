@@ -31,10 +31,10 @@ print("Using device:", device)
 FACES_TRAIN_DIR = os.path.join("faces", "train")
 FACES_TEST_DIR = os.path.join("faces", "test")
 
-EPOCHS = 60
-BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
-PATIENCE = 15  # early stopping
+EPOCHS = 40 # total training epochs
+BATCH_SIZE = 32 
+LEARNING_RATE = 1e-4 
+PATIENCE = 12  # early stopping, when no improvement in val accuracy for this many epochs
 
 
 def build_dataloaders():
@@ -42,7 +42,7 @@ def build_dataloaders():
     Build train/test DataLoaders for faces/ using ImageFolder.
     """
 
-    train_transform = transforms.Compose([
+    train_transform = transforms.Compose([ # Data Augmentation
         transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
@@ -73,7 +73,7 @@ def build_dataloaders():
     print("ImageFolder class_to_idx:", train_dataset.class_to_idx)
     return train_loader, test_loader, train_dataset.class_to_idx
 
-def mixup_data(x, y, alpha=0.2):
+def mixup_data(x, y, alpha=0.2): 
     """Apply MixUp to a batch."""
     if alpha <= 0:
         return x, y, y, 1.0
@@ -86,7 +86,7 @@ def mixup_data(x, y, alpha=0.2):
     return mixed_x, y_a, y_b, lam
 
 def rand_bbox(size, lam):
-    """Generate CutMix bounding box."""
+    """Generate CutMix bounding box.""" 
     W = size[2]
     H = size[3]
     cut_rat = np.sqrt(1.0 - lam)
@@ -103,7 +103,7 @@ def rand_bbox(size, lam):
 
     return x1, y1, x2, y2
 
-def cutmix_data(x, y, alpha=1.0):
+def cutmix_data(x, y, alpha=1.0): 
     """Apply CutMix to a batch."""
     if alpha <= 0:
         return x, y, y, 1.0
@@ -121,7 +121,7 @@ def cutmix_data(x, y, alpha=1.0):
     lam = 1.0 - ((x2 - x1) * (y2 - y1) / (x.size(-1) * x.size(-2)))
     return x, y_a, y_b, lam 
 
-def train_resnet():
+def train_resnet(): # Train ResNet18 emotion classifier
     if not os.path.isdir(FACES_TRAIN_DIR) or not os.path.isdir(FACES_TEST_DIR):
         raise FileNotFoundError(
             "faces/train or faces/test not found. Run preprocess_faces.py first."
