@@ -1,3 +1,4 @@
+import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,14 +7,7 @@ import cv2
 import mediapipe as mp
 
 class RegionFeatureExtractor:    
-    REGION_LANDMARKS = {
-        'left_eye': [33, 160, 158, 133, 153, 144, 163, 7],
-        'right_eye': [362, 385, 387, 263, 373, 380, 390, 249],
-        'left_eyebrow': [70, 63, 105, 66, 107, 55, 65],
-        'right_eyebrow': [300, 293, 334, 296, 336, 285, 295],
-        'nose': [1, 2, 98, 327, 168, 6, 197, 195, 5],
-        'mouth': [61, 291, 0, 17, 13, 14, 78, 308, 415, 310, 311, 312, 82, 87]
-    }
+    
     
     def __init__(self, static_mode=False):
         self.mp_face_mesh = mp.solutions.face_mesh
@@ -26,6 +20,14 @@ class RegionFeatureExtractor:
         )
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_drawing_styles = mp.solutions.drawing_styles
+        self.REGION_LANDMARKS = {
+        'LEFT_EYE': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_LEFT_EYE))),
+        'RIGHT_EYE': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_RIGHT_EYE))),
+        'LEFT_EYEBROW': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_LEFT_EYEBROW))),
+        'RIGHT_EYEBROW': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_RIGHT_EYEBROW))),
+        'LIPS': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_LIPS))),
+        'CONTOURS': list(set(itertools.chain(*self.mp_face_mesh.FACEMESH_CONTOURS))),
+    }
     
     def extract_features(self, frame_rgb):
         """Extract geometric features from facial regions."""
@@ -64,24 +66,22 @@ class RegionFeatureExtractor:
             else:
                 area = x_range * y_range
             
-            rel_position = centroid
-            
             features.extend([
-                *centroid, *spread, x_range, y_range, aspect_ratio, area, *rel_position
+                *centroid, *spread, x_range, y_range, aspect_ratio, area
             ])
         
         # Inter-region features
-        left_eye_center = all_points[self.REGION_LANDMARKS['left_eye']].mean(axis=0)
-        right_eye_center = all_points[self.REGION_LANDMARKS['right_eye']].mean(axis=0)
+        left_eye_center = all_points[self.REGION_LANDMARKS['LEFT_EYE']].mean(axis=0)
+        right_eye_center = all_points[self.REGION_LANDMARKS['RIGHT_EYE']].mean(axis=0)
         eye_distance = np.linalg.norm(left_eye_center - right_eye_center) / (face_scale + 1e-6)
         
-        mouth_points = all_points[self.REGION_LANDMARKS['mouth']]
+        mouth_points = all_points[self.REGION_LANDMARKS['LIPS']]
         mouth_height = (mouth_points[:, 1].max() - mouth_points[:, 1].min()) / (face_scale + 1e-6)
         mouth_width = (mouth_points[:, 0].max() - mouth_points[:, 0].min()) / (face_scale + 1e-6)
         mouth_ratio = mouth_height / (mouth_width + 1e-6)
         
-        left_brow_center = all_points[self.REGION_LANDMARKS['left_eyebrow']].mean(axis=0)
-        right_brow_center = all_points[self.REGION_LANDMARKS['right_eyebrow']].mean(axis=0)
+        left_brow_center = all_points[self.REGION_LANDMARKS['LEFT_EYEBROW']].mean(axis=0)
+        right_brow_center = all_points[self.REGION_LANDMARKS['RIGHT_EYEBROW']].mean(axis=0)
         left_brow_raise = (left_eye_center[1] - left_brow_center[1]) / (face_scale + 1e-6)
         right_brow_raise = (right_eye_center[1] - right_brow_center[1]) / (face_scale + 1e-6)
         
@@ -93,7 +93,7 @@ class RegionFeatureExtractor:
         return np.array(features, dtype=np.float32)
     
     def get_feature_count(self):
-        return len(self.REGION_LANDMARKS) * 13 + 6
+        return len(self.REGION_LANDMARKS) * 10 + 6
     
     def draw_landmarks(self, frame, draw_regions=True):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -112,9 +112,9 @@ class RegionFeatureExtractor:
                 if draw_regions:
                     h, w = frame.shape[:2]
                     colors = {
-                        'left_eye': (255, 0, 0), 'right_eye': (255, 0, 0),
-                        'left_eyebrow': (0, 255, 0), 'right_eyebrow': (0, 255, 0),
-                        'nose': (0, 0, 255), 'mouth': (255, 255, 0)
+                        'LEFT_EYE': (255, 0, 0), 'RIGHT_EYE': (255, 0, 0),
+                        'LEFT_EYEBROW': (0, 255, 0), 'RIGHT_EYEBROW': (0, 255, 0),
+                        'LIPS': (255, 255, 0), 'CONTOURS': (0, 0, 255)
                     }
                     
                     for region_name, indices in self.REGION_LANDMARKS.items():
@@ -130,7 +130,7 @@ class RegionFeatureExtractor:
 
 
 class Region_Net(nn.Module):
-    def __init__(self, input_size=84, num_classes=7):
+    def __init__(self, input_size=66, num_classes=7):
         super().__init__()
         
         self.fc1 = nn.Linear(input_size, 256)

@@ -143,9 +143,7 @@ def train_model():
     best_acc = 0.0
     patience = 0
     
-    print("\n" + "="*50)
     print("TRAINING REGION MODEL")
-    print("="*50)
     
     for epoch in range(EPOCHS):
         # Train
@@ -236,17 +234,13 @@ def train_model():
 
 
 if __name__ == '__main__':
-    print("="*50)
-    print("STEP 1: EXTRACTING FEATURES")
-    print("="*50)
+    print("EXTRACTING FEATURES")
     
     extractor = FeatureExtractor()
     extractor.extract_from_folder(TRAIN_DIR, 'train')
     extractor.extract_from_folder(TEST_DIR, 'test')
     extractor.close()
-    
-    print("\n" + "="*50)
-    print("STEP 2: TRAINING MODEL")
-    print("="*50)
+
+    print("TRAINING MODEL")
     
     train_model()
