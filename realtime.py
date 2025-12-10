@@ -192,7 +192,7 @@ class EmotionDetector:
                 cv2.putText(frame, emo[:3], (start_x + bar_w + 3, y_pos + 10),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255,255,255), 1)
     
-    def run(self, camera_id=0, show_probs=True, show_landmarks=False):
+    def run(self, camera_id=0, show_probs=True):
         """Main loop."""
         cap = cv2.VideoCapture(camera_id)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -202,7 +202,7 @@ class EmotionDetector:
             print("Cannot open camera")
             return
         
-        print("\nControls: q=quit, p=toggle probs, l=toggle landmarks, s=screenshot")
+        print("\nControls: q=quit, p=toggle probs, s=screenshot")
         
         while True:
             start = time.time()
@@ -226,9 +226,6 @@ class EmotionDetector:
                 results = self.predict(frame, face_roi)
                 frame = self.draw_results(frame, results, x, y, w, h, show_probs)
             
-            if show_landmarks and self.region_available:
-                frame = self.region_extractor.draw_landmarks(frame)
-            
             fps = 1.0 / (time.time() - start + 1e-6)
             self.fps_history.append(fps)
             cv2.putText(frame, f"FPS: {np.mean(self.fps_history):.1f}", 
@@ -241,8 +238,6 @@ class EmotionDetector:
                 break
             elif key == ord('p'):
                 show_probs = not show_probs
-            elif key == ord('l'):
-                show_landmarks = not show_landmarks
             elif key == ord('s'):
                 cv2.imwrite(f"screenshot_{int(time.time())}.png", frame)
                 print("Screenshot saved")

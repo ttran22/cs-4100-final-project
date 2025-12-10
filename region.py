@@ -7,8 +7,6 @@ import cv2
 import mediapipe as mp
 
 class RegionFeatureExtractor:    
-    
-    
     def __init__(self, static_mode=False):
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
@@ -94,36 +92,6 @@ class RegionFeatureExtractor:
     
     def get_feature_count(self):
         return len(self.REGION_LANDMARKS) * 10 + 6
-    
-    def draw_landmarks(self, frame, draw_regions=True):
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.face_mesh.process(frame_rgb)
-        
-        if results.multi_face_landmarks:
-            for face_landmarks in results.multi_face_landmarks:
-                self.mp_drawing.draw_landmarks(
-                    image=frame,
-                    landmark_list=face_landmarks,
-                    connections=self.mp_face_mesh.FACEMESH_TESSELATION,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_tesselation_style()
-                )
-                
-                if draw_regions:
-                    h, w = frame.shape[:2]
-                    colors = {
-                        'LEFT_EYE': (255, 0, 0), 'RIGHT_EYE': (255, 0, 0),
-                        'LEFT_EYEBROW': (0, 255, 0), 'RIGHT_EYEBROW': (0, 255, 0),
-                        'LIPS': (255, 255, 0), 'CONTOURS': (0, 0, 255)
-                    }
-                    
-                    for region_name, indices in self.REGION_LANDMARKS.items():
-                        for idx in indices:
-                            lm = face_landmarks.landmark[idx]
-                            x, y = int(lm.x * w), int(lm.y * h)
-                            cv2.circle(frame, (x, y), 2, colors[region_name], -1)
-        
-        return frame
     
     def close(self):
         self.face_mesh.close()
